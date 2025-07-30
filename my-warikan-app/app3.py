@@ -3,7 +3,7 @@ import pandas as pd
 import math
 
 # --- ページの初期設定 ---
-st.set_page_config(page_title="完成版 割り勘アプリ", page_icon="🎉", layout="centered")
+st.set_page_config(page_title="最新版 割り勘アプリ", page_icon="✅", layout="centered")
 
 # --- Session Stateの初期化 ---
 if 'members' not in st.session_state:
@@ -20,7 +20,7 @@ def add_member():
         st.session_state.members.append(new_member)
     st.session_state.new_member_input = "" # 入力欄をクリア
 
-st.title("完成版 割り勘アプリ 🎉")
+st.title("最新版 割り勘アプリ ✅")
 
 # --- メンバー登録 ---
 st.header("メンバー登録")
@@ -42,14 +42,13 @@ if st.session_state.members:
             if st.button("×", key=f"delete_member_{member}", use_container_width=True):
                 st.session_state.members.remove(member)
                 st.session_state.payments = [p for p in st.session_state.payments if p['支払った人'] != member]
-                st.experimental_rerun()
+                st.rerun() # エラー修正: st.experimental_rerun() -> st.rerun()
 
 st.divider()
 
 # --- 支払い登録・編集 ---
 st.header("支払い登録・編集")
 if st.session_state.members:
-    # 編集中の場合はそのデータをフォームのデフォルト値に設定
     editing_defaults = {}
     if st.session_state.editing_payment_index is not None:
         editing_payment = st.session_state.payments[st.session_state.editing_payment_index]
@@ -59,25 +58,23 @@ if st.session_state.members:
             "memo": editing_payment["内容"]
         }
 
-    with st.form("payment_form", clear_on_submit=False): # clear_on_submitをFalseに
-        payer = st.selectbox("支払った人", options=st.session_state.members, index=st.session_state.members.index(editing_defaults.get("payer")) if "payer" in editing_defaults else 0)
-        amount = st.number_input("金額 (円)", value=editing_defaults.get("amount"), placeholder="例: 5000")
+    with st.form("payment_form"):
+        payer_index = st.session_state.members.index(editing_defaults["payer"]) if "payer" in editing_defaults and editing_defaults["payer"] in st.session_state.members else 0
+        payer = st.selectbox("支払った人", options=st.session_state.members, index=payer_index)
+        amount = st.number_input("金額 (円)", value=editing_defaults.get("amount"), placeholder="例: 5000", step=1, format="%d")
         memo = st.text_input("内容（メモ）", value=editing_defaults.get("memo", ""), placeholder="例: 夕食代")
         
-        submitted = st.form_submit_button("保存する")
-        if submitted:
+        if st.form_submit_button("保存する"):
             if amount and amount > 0:
-                new_payment = {"支払った人": payer, "金額": amount, "内容": memo}
+                new_payment = {"支払った人": payer, "金額": int(amount), "内容": memo} # 金額を整数に
                 if st.session_state.editing_payment_index is not None:
-                    # 編集モードの場合は上書き
                     st.session_state.payments[st.session_state.editing_payment_index] = new_payment
                     st.success("支払いを更新しました。")
-                    st.session_state.editing_payment_index = None # 編集モードを解除
+                    st.session_state.editing_payment_index = None
                 else:
-                    # 新規登録
                     st.session_state.payments.append(new_payment)
                     st.success("支払いを登録しました。")
-                st.experimental_rerun() # フォームをリセットして画面を更新
+                st.rerun() # エラー修正: st.experimental_rerun() -> st.rerun()
             else:
                 st.warning("有効な金額を入力してください。")
 else:
@@ -99,14 +96,13 @@ if st.session_state.payments:
         with col4:
             if st.button("編集", key=f"edit_{i}"):
                 st.session_state.editing_payment_index = i
-                st.experimental_rerun()
+                st.rerun() # エラー修正: st.experimental_rerun() -> st.rerun()
         with col5:
             if st.button("×", key=f"delete_payment_{i}"):
                 st.session_state.payments.pop(i)
-                st.experimental_rerun()
+                st.rerun() # エラー修正: st.experimental_rerun() -> st.rerun()
 else:
     st.info("支払いはまだ登録されていません。")
-
 
 st.divider()
 
@@ -147,3 +143,4 @@ if st.button("精算する！", type="primary", use_container_width=True):
                 st.markdown(f"- {t}")
     else:
         st.warning("精算するには、2人以上のメンバーと1件以上の支払いが必要です。")
+        
