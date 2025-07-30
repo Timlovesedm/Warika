@@ -3,7 +3,7 @@ import pandas as pd
 import math
 
 # --- ページの初期設定 ---
-st.set_page_config(page_title="最新版 割り勘アプリ", page_icon="✅", layout="centered")
+st.set_page_config(page_title="最終版 割り勘アプリ", page_icon="🎯", layout="centered")
 
 # --- Session Stateの初期化 ---
 if 'members' not in st.session_state:
@@ -20,7 +20,7 @@ def add_member():
         st.session_state.members.append(new_member)
     st.session_state.new_member_input = "" # 入力欄をクリア
 
-st.title("最新版 割り勘アプリ ✅")
+st.title("最終版 割り勘アプリ 🎯")
 
 # --- メンバー登録 ---
 st.header("メンバー登録")
@@ -40,41 +40,56 @@ if st.session_state.members:
             st.markdown(f"""<div style="padding: 8px 12px; background-color: #f0f2f6; border-radius: 8px;">{member}</div>""", unsafe_allow_html=True)
         with col2:
             if st.button("×", key=f"delete_member_{member}", use_container_width=True):
-                st.session_state.members.remove(member)
+                # メンバー削除時に、関連する支払いも削除
                 st.session_state.payments = [p for p in st.session_state.payments if p['支払った人'] != member]
-                st.rerun() # エラー修正: st.experimental_rerun() -> st.rerun()
+                st.session_state.members.remove(member)
+                # エラー防止：編集状態をリセット
+                st.session_state.editing_payment_index = None
+                st.rerun()
 
 st.divider()
 
 # --- 支払い登録・編集 ---
-st.header("支払い登録・編集")
+# 編集モードかどうかに応じてヘッダーとボタンのテキストを変更
+is_editing = st.session_state.editing_payment_index is not None
+header_text = "支払いを編集" if is_editing else "支払い登録"
+button_text = "更新する" if is_editing else "登録する"
+
+st.header(header_text)
 if st.session_state.members:
     editing_defaults = {}
-    if st.session_state.editing_payment_index is not None:
-        editing_payment = st.session_state.payments[st.session_state.editing_payment_index]
-        editing_defaults = {
-            "payer": editing_payment["支払った人"],
-            "amount": editing_payment["金額"],
-            "memo": editing_payment["内容"]
-        }
+    if is_editing:
+        # 編集中の支払いが存在することを確認
+        if st.session_state.editing_payment_index < len(st.session_state.payments):
+            editing_payment = st.session_state.payments[st.session_state.editing_payment_index]
+            editing_defaults = {
+                "payer": editing_payment["支払った人"],
+                "amount": editing_payment["金額"],
+                "memo": editing_payment["内容"]
+            }
 
     with st.form("payment_form"):
-        payer_index = st.session_state.members.index(editing_defaults["payer"]) if "payer" in editing_defaults and editing_defaults["payer"] in st.session_state.members else 0
-        payer = st.selectbox("支払った人", options=st.session_state.members, index=payer_index)
+        # 編集中のデータが存在し、その人がメンバーリストにいる場合、その人をデフォルトで選択
+        default_payer_index = 0
+        if "payer" in editing_defaults and editing_defaults["payer"] in st.session_state.members:
+            default_payer_index = st.session_state.members.index(editing_defaults["payer"])
+        
+        payer = st.selectbox("支払った人", options=st.session_state.members, index=default_payer_index)
         amount = st.number_input("金額 (円)", value=editing_defaults.get("amount"), placeholder="例: 5000", step=1, format="%d")
         memo = st.text_input("内容（メモ）", value=editing_defaults.get("memo", ""), placeholder="例: 夕食代")
         
-        if st.form_submit_button("保存する"):
+        if st.form_submit_button(button_text):
             if amount and amount > 0:
-                new_payment = {"支払った人": payer, "金額": int(amount), "内容": memo} # 金額を整数に
-                if st.session_state.editing_payment_index is not None:
+                new_payment = {"支払った人": payer, "金額": int(amount), "内容": memo}
+                if is_editing:
                     st.session_state.payments[st.session_state.editing_payment_index] = new_payment
                     st.success("支払いを更新しました。")
-                    st.session_state.editing_payment_index = None
                 else:
                     st.session_state.payments.append(new_payment)
                     st.success("支払いを登録しました。")
-                st.rerun() # エラー修正: st.experimental_rerun() -> st.rerun()
+                # フォームをリセットするために編集状態を解除
+                st.session_state.editing_payment_index = None
+                st.rerun()
             else:
                 st.warning("有効な金額を入力してください。")
 else:
@@ -96,11 +111,13 @@ if st.session_state.payments:
         with col4:
             if st.button("編集", key=f"edit_{i}"):
                 st.session_state.editing_payment_index = i
-                st.rerun() # エラー修正: st.experimental_rerun() -> st.rerun()
+                st.rerun()
         with col5:
             if st.button("×", key=f"delete_payment_{i}"):
                 st.session_state.payments.pop(i)
-                st.rerun() # エラー修正: st.experimental_rerun() -> st.rerun()
+                # エラー防止：編集状態をリセット
+                st.session_state.editing_payment_index = None
+                st.rerun()
 else:
     st.info("支払いはまだ登録されていません。")
 
@@ -109,6 +126,7 @@ st.divider()
 # --- 精算 ---
 st.header("精算")
 if st.button("精算する！", type="primary", use_container_width=True):
+    # 精算ロジックは変更なし
     if len(st.session_state.members) > 1 and st.session_state.payments:
         total_spent = sum(p['金額'] for p in st.session_state.payments)
         cost_per_person = total_spent / len(st.session_state.members)
@@ -143,4 +161,3 @@ if st.button("精算する！", type="primary", use_container_width=True):
                 st.markdown(f"- {t}")
     else:
         st.warning("精算するには、2人以上のメンバーと1件以上の支払いが必要です。")
-        
